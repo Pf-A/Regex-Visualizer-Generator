@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Regex Visualizer & Generator</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <style>
+        body { font-family: system-ui, sans-serif; margin: 0; background: #181c20; color: #f3f3f3; }
+        header { background: #23272b; padding: 1em 2em; }
+        h1 { margin: 0; font-size: 2em; }
+        main { max-width: 900px; margin: 2em auto; background: #23272b; border-radius: 12px; box-shadow: 0 2px 16px #0008; padding: 2em; }
+        label { display: block; margin-top: 1.5em; font-weight: bold; }
+        input, textarea, select { width: 100%; padding: 0.5em; margin-top: 0.5em; border-radius: 6px; border: none; background: #181c20; color: #f3f3f3; font-size: 1em; }
+        .regex-output { font-family: monospace; background: #111417; padding: 1em; border-radius: 6px; margin-top: 1em; }
+        .matches { margin-top: 1em; }
+        .match { background: #2e7d32; color: #fff; padding: 0.2em 0.4em; border-radius: 4px; margin: 0 0.1em; }
+        .error { color: #ff5252; }
+        .explanation { margin-top: 1em; background: #1a1e22; padding: 1em; border-radius: 6px; }
+        .examples { margin-top: 1em; }
+        button { background: #2e7d32; color: #fff; border: none; padding: 0.7em 1.5em; border-radius: 6px; font-size: 1em; margin-top: 1em; cursor: pointer; }
+        button:active { background: #256027; }
+        @media (max-width: 600px) {
+            main { padding: 1em; }
+            header { padding: 1em; }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Regex Visualizer & Generator</h1>
+        <div style="font-size:1.1em;color:#bdbdbd;">Build, test, and understand regular expressions interactively.</div>
+    </header>
+    <main>
+        <label for="preset">Choose a preset or start from scratch:</label>
+        <select id="preset">
+            <option value="">-- Select a preset --</option>
+            <option value="email">Email Address</option>
+            <option value="url">URL</option>
+            <option value="date">Date (YYYY-MM-DD)</option>
+            <option value="ipv4">IPv4 Address</option>
+            <option value="custom">Custom</option>
+        </select>
+
+        <label for="regex">Regular Expression:</label>
+        <input id="regex" type="text" placeholder="e.g. ^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$">
+
+        <label for="flags">Flags:</label>
+        <input id="flags" type="text" placeholder="e.g. gi">
+
+        <label for="teststr">Test String:</label>
+        <textarea id="teststr" rows="4" placeholder="Paste your test string here..."></textarea>
+
+        <button id="explainBtn">Explain Regex</button>
+        <button id="generateBtn">Generate Regex from Description</button>
+
+        <div class="regex-output" id="regexOutput"></div>
+        <div class="matches" id="matches"></div>
+        <div class="error" id="error"></div>
+        <div class="explanation" id="explanation"></div>
+        <div class="examples">
+            <strong>Examples:</strong>
+            <ul>
+                <li>Email: <code>^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$</code></li>
+                <li>URL: <code>https?:\/\/[^\s/$.?#].[^\s]*</code></li>
+                <li>Date: <code>^\d{4}-\d{2}-\d{2}$</code></li>
+                <li>IPv4: <code>^(?:\d{1,3}\.){3}\d{1,3}$</code></li>
+            </ul>
+        </div>
+    </main>
+    <script>
+        // Presets
+        const presets = {
+            email: {
+                regex: '^[a-z0-9._%+-]+@[a-z0-9.-]+\\.[a-z]{2,}$',
+                flags: 'i',
+                test: 'test@example.com\nfoo@bar.co.uk\ninvalid@'
+            },
+            url: {
+                regex: 'https?:\\/\\/[^\s/$.?#].[^\s]*',
+                flags: 'i',
+                test: 'https://github.com\nhttp://example.com\nnot a url'
+            },
+            date: {
+                regex: '^\\d{4}-\\d{2}-\\d{2}$',
+                flags: '',
+                test: '2024-06-01\n01-06-2024\n2024-13-01'
+            },
+            ipv4: {
+                regex: '^(?:\\d{1,3}\\.){3}\\d{1,3}$',
+                flags: '',
+                test: '192.168.1.1\n256.100.50.25\n127.0.0.1'
+            }
+        };
+
+        // Elements
+        const presetEl = document.getElementById('preset');
+        const regexEl = document.getElementById('regex');
+        const flagsEl = document.getElementById('flags');
+        const teststrEl = document.getElementById('teststr');
+        const regexOutputEl = document.getElementById('regexOutput');
+        const matchesEl = document.getElementById('matches');
+        const errorEl = document.getElementById('error');
+        const explanationEl = document.getElementById('explanation');
+        const explainBtn = document.getElementById('explainBtn');
+        const generateBtn = document.getElementById('generateBtn');
+
+        // Regex Explanation (simple, not AI)
+        function explainRegex(pattern) {
+            // Very basic explanation for demo purposes
+            let exp = pattern
+                .replace(/\\d/g, '<b>\\d</b>: digit')
+                .replace(/\\w/g, '<b>\\w</b>: word char')
+                .replace(/\\s/g, '<b>\\s</b>: whitespace')
+                .replace(/\./g, '<b>.</b>: any char')
+                .replace(/\^/g, '<b>^</b>: start')
+                .replace(/\$/g, '<b>$</b>: end')
+                .replace(/\+/g, '<b>+</b>: one or more')
+                .replace(/\*/g, '<b>*</b>: zero or more')
+                .replace(/\?/g, '<b>?</b>: optional')
+                .replace(/\{/g, '<b>{</b>: quantifier start')
+                .replace(/\}/g, '<b>}</b>: quantifier end')
+                .replace(/\[/g, '<b>[</b>: character class start')
+                .replace(/\]/g, '<b>]</b>: character class end')
+                .replace(/\(/g, '<b>(</b>: group start')
+                .replace(/\)/g, '<b>)</b>: group end')
+                .replace(/\|/g, '<b>|</b>: or');
+            return exp;
+        }
+
+        // Regex Generator (very basic, not AI)
+        function generateRegexFromDescription(desc) {
+            // Only a few hardcoded cases for demo
+            desc = desc.toLowerCase();
+            if (desc.includes('email')) return presets.email.regex;
+            if (desc.includes('url')) return presets.url.regex;
+            if (desc.includes('date')) return presets.date.regex;
+            if (desc.includes('ipv4')) return presets.ipv4.regex;
+            return '^.*$';
+        }
+
+        // Highlight matches
+        function highlightMatches(str, regex) {
+            if (!regex) return str;
+            let lastIndex = 0;
+            let result = '';
+            let m;
+            regex.lastIndex = 0;
+            while ((m = regex.exec(str)) !== null) {
+                result += str.slice(lastIndex, m.index);
+                result += `<span class="match">${m[0]}</span>`;
+                lastIndex = m.index + m[0].length;
+                if (!regex.global) break;
+            }
+            result += str.slice(lastIndex);
+            return result;
+        }
+
+        // Update output
+        function update() {
+            errorEl.textContent = '';
+            explanationEl.innerHTML = '';
+            let pattern = regexEl.value;
+            let flags = flagsEl.value;
+            let teststr = teststrEl.value;
+            regexOutputEl.textContent = `/${pattern}/${flags}`;
+            if (!pattern) {
+                matchesEl.innerHTML = '';
+                return;
+            }
+            try {
+                let re = new RegExp(pattern, flags);
+                let lines = teststr.split('\n');
+                let html = '';
+                for (let line of lines) {
+                    if (line.trim() === '') continue;
+                    let highlighted = highlightMatches(line, re);
+                    html += `<div>${highlighted}</div>`;
+                }
+                matchesEl.innerHTML = html;
+            } catch (e) {
+                errorEl.textContent = e.message;
+                matchesEl.innerHTML = '';
+            }
+        }
+
+        // Preset change
+        presetEl.addEventListener('change', () => {
+            let val = presetEl.value;
+            if (presets[val]) {
+                regexEl.value = presets[val].regex;
+                flagsEl.value = presets[val].flags;
+                teststrEl.value = presets[val].test;
+            } else {
+                regexEl.value = '';
+                flagsEl.value = '';
+                teststrEl.value = '';
+            }
+            update();
+        });
+
+        // Input events
+        regexEl.addEventListener('input', update);
+        flagsEl.addEventListener('input', update);
+        teststrEl.addEventListener('input', update);
+
+        // Explain button
+        explainBtn.addEventListener('click', () => {
+            let pattern = regexEl.value;
+            if (!pattern) {
+                explanationEl.innerHTML = '';
+                return;
+            }
+            explanationEl.innerHTML = '<strong>Explanation:</strong><br>' + explainRegex(pattern);
+        });
+
+        // Generate button
+        generateBtn.addEventListener('click', () => {
+            let desc = prompt('Describe what you want to match (e.g. "email address", "IPv4 address")');
+            if (desc) {
+                regexEl.value = generateRegexFromDescription(desc);
+                update();
+            }
+        });
+
+        // Initial update
+        update();
+    </script>
+</body>
+</html>
